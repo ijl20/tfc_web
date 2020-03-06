@@ -21,23 +21,69 @@ logger = logging.getLogger(__name__)
 def anpr_map(request, return_format='html'):
     start_time = request.GET.get('datetime', time.mktime(datetime(day=11, month=6, year=2017, hour=8).timetuple()))
     start_time = datetime.fromtimestamp(int(start_time))
+
+    camera_origin_id = request.GET.get('camera_origin_id')
+    camera_destination_id = request.GET.get('camera_destination_id')
+
     # Discard all trips that took longer than 3 hours as these are very likely round trips.
     trips_m = TripChain.objects.filter(entry_time__range=(start_time, start_time + timedelta(hours=1)),
                                        total_trip_time__lt=timedelta(hours=3))
+
+    if camera_origin_id and camera_destination_id:
+        trips_m = trips_m.filter(
+            chain_vector__regex=r'^([A-Za-z0-9]+(_[A-Za-z]+)?>)*' + camera_origin_id +
+                                '(_[A-Za-z]+)?>?([A-Za-z0-9]+(_[A-Za-z]+)?>)*' + camera_destination_id +
+                                '(_[A-Za-z]+)?(>[A-Za-z0-9]+(_[A-Za-z]+)?)*$')
+    elif camera_origin_id:
+        trips_m = trips_m.filter(chain_vector__regex=r'^([A-Za-z0-9]+(_[A-Za-z]+)?>)*' + camera_origin_id +
+                                                     '(_[A-Za-z]+)?(>[A-Za-z0-9]+(_[A-Za-z]+)?)*$')
+
     trips = []
     for trip_m in trips_m:
         trips.append({
             "time": trip_m.entry_time,
             "chain_vector": re.split(r'_[A-Za-z]+>?', trip_m.chain_vector)[0:-1]
         })
+
+    #calculate stats
+    day = start_time.date()
+    start_time_stats = datetime.combine(day, datetime.min.time())
+    stats = []
+    total_stats = []
+    for i in range(0,24):
+        # Discard all trips that took longer than 3 hours as these are very likely round trips.
+        trips_m = TripChain.objects.filter(entry_time__range=(start_time_stats, start_time_stats + timedelta(hours=1)))
+        total_stats.append({
+            "time": start_time_stats,
+            "num": trips_m.count()
+        })
+        if camera_origin_id and camera_destination_id:
+            trips_m = trips_m.filter(
+                chain_vector__regex=r'^([A-Za-z0-9]+(_[A-Za-z]+)?>)*' + camera_origin_id +
+                                    '(_[A-Za-z]+)?>?([A-Za-z0-9]+(_[A-Za-z]+)?>)*' + camera_destination_id +
+                                    '(_[A-Za-z]+)?(>[A-Za-z0-9]+(_[A-Za-z]+)?)*$')
+        elif camera_origin_id:
+            trips_m = trips_m.filter(chain_vector__regex=r'^([A-Za-z0-9]+(_[A-Za-z]+)?>)*' + camera_origin_id +
+                                                         '(_[A-Za-z]+)?(>[A-Za-z0-9]+(_[A-Za-z]+)?)*$')
+        if camera_origin_id:
+            stats.append({
+                "time": start_time_stats,
+                "num": trips_m.count()
+            })
+        start_time_stats += timedelta(hours=1)
+
     if return_format == 'html':
         return render(request, 'traffic/anpr_camera.html', {
             'cameras': ANPRCamera.objects.all(),
-            'trips': json.dumps(trips, cls=DjangoJSONEncoder)
+            'trips': json.dumps(trips, cls=DjangoJSONEncoder),
+            'stats': json.dumps(stats, cls=DjangoJSONEncoder),
+            'total_stats': json.dumps(total_stats, cls=DjangoJSONEncoder)
         })
     elif return_format == 'json':
         return JsonResponse({
-            'trips': trips
+            'trips': trips,
+            'stats': stats,
+            'total_stats': total_stats
         })
     else:
         raise Exception('Format not supported')

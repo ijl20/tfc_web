@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from api import util
+from traffic.models import ANPRCamera, Trip
 
 
 class ZoneJourneySerializer(serializers.Serializer):
@@ -120,3 +121,19 @@ class BTJourneyLinkRecordListSerializer(serializers.Serializer):
     request_data = BTJourneyLinkRecordSerializer(many=True)
     ts = serializers.IntegerField(required=False)
     ts_text = util.EpochField(source='ts', required=False)
+
+
+class ANPRCameraSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = ANPRCamera
+        fields = ['id', 'description', 'lat', 'lng']
+
+
+class ANPRTripSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Trip
+        fields = ['entry_time', 'entry_lane', 'entry_direction', 'entry_camera_id', 'entry_absolute_direction',
+                  'confidence', 'exit_time', 'exit_lane', 'exit_direction', 'exit_camera_id', 'exit_absolute_direction',
+                  'journey_time']

@@ -1,5 +1,6 @@
 from django.db import models
 
+
 class ANPRCamera(models.Model):
     id = models.CharField(primary_key=True, max_length=10)
     units = models.IntegerField()
@@ -34,3 +35,12 @@ class TripChain(models.Model):
     chain_vector = models.CharField(max_length=600)
     # Chain vector with time (does not include initial camera)
     chain_vector_time = models.CharField(max_length=600)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['camera_id', 'entry_time', 'total_trip_time', 'chain_vector']),
+            models.Index(fields=['camera_id']),
+            models.Index(fields=['entry_time']),
+            models.Index(fields=['chain_vector']),
+            models.Index(fields=['chain_vector_time']),
+        ]

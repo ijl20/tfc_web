@@ -3,23 +3,29 @@ from datetime import timedelta
 import logging
 import os
 
+from rest_framework import filters
 from rest_framework.response import Response
 from rest_framework.exceptions import NotFound
 from rest_framework.schemas import AutoSchema
 
+from transport.api.views import Pagination, string_to_datetime, transport_stops_pagination_fields
+
 import coreapi
 import coreschema
 
+from ..models import ANPRCamera, Trip
 from .serializers import (
     ZoneListSerializer, ZoneConfigSerializer, ZoneHistorySerializer,
     BTJourneySiteSerializer, BTJourneySiteListSerializer,
     BTJourneyLinkOrRouteSerializer,
     BTJourneyLinkListSerializer, BTJourneyRouteListSerializer,
-    BTJourneyLinkRecordSerializer, BTJourneyLinkRecordListSerializer)
+    BTJourneyLinkRecordSerializer, BTJourneyLinkRecordListSerializer,
+    ANPRCameraSerializer, ANPRTripSerializer)
 from api import util, auth
 
 
 logger = logging.getLogger(__name__)
+
 
 zone_id_fields = [
     coreapi.Field(
@@ -384,3 +390,101 @@ class BTJourneyLinkLatest(auth.AuthenticateddAPIView):
                 serializer = BTJourneyLinkRecordSerializer(value)
                 return Response(serializer.data)
         raise NotFound("No data found for link '{0}'".format(id))
+
+
+# ANPR
+
+class ANPRCameraList(auth.AuthenticateddAPIView):
+    """
+    Return a list of bus stops.
+    """
+    queryset = ANPRCamera.objects.all()
+    serializer_class = ANPRCameraSerializer
+
+ANPRTripList_schema = AutoSchema(
+    manual_fields=transport_stops_pagination_fields + [
+        coreapi.Field(
+            "datetime_from",
+            required=False,
+            location="query",
+            schema=coreschema.String(
+                description="Start datetime for returned results."),
+            description="Start datetime for returned results.",
+            example="2017-06-12T12:00:00",
+        ),
+        coreapi.Field(
+            "datetime_to",
+            required=False,
+            location="query",
+            schema=coreschema.String(
+                description="End datetime for returned results."),
+            description="End datetime for returned results.",
+            example="2017-06-12T12:00:00",
+        ),
+        coreapi.Field(
+            "entry_camera_id",
+            required=False,
+            location="query",
+            schema=coreschema.String(
+                description="Limit results to trips that have this as the entry camera."
+                ),
+            description="Limit results to trips that have this as the entry camera."
+        ),
+        coreapi.Field(
+            "exit_camera_id",
+            required=False,
+            location="query",
+            schema=coreschema.String(
+                description="Limit results to trips that have this as the exit camera."
+                ),
+            description="Limit results to trips that have this as the exit camera."
+        ),
+        coreapi.Field(
+            "ordering",
+            required=False,
+            location="query",
+            schema=coreschema.String(
+                description="Field to sort results by. One of "
+                            "'entry_time', 'entry_camera_id', 'exit_camera_id'."
+                ),
+            description="Field to sort results by. One of "
+                        "'entry_time', 'entry_camera_id', 'exit_camera_id'."
+        ),
+    ]
+)
+
+
+class ANPRTripList(auth.AuthenticateddAPIView):
+    """
+    ANPR based trips
+    """
+    serializer_class = ANPRTripSerializer
+    pagination_class = Pagination
+    filter_backends = (filters.SearchFilter, filters.OrderingFilter)
+    ordering_fields = ('entry_time', 'entry_camera_id', 'exit_camera_id')
+    ordering = ('entry_time', )
+    search_fields = ('entry_camera_id', 'exit_camera_id')
+
+    schema = ANPRTripList_schema
+
+    def list(self, request, *args, **kwargs):
+        self.datetime_from = string_to_datetime(self.request.query_params.get('datetime_from', None))
+        self.datetime_to = string_to_datetime(self.request.query_params.get('datetime_to', None))
+        self.entry_camera_id = self.request.query_params.get('entry_camera_id', None)
+        self.exit_camera_id = self.request.query_params.get('exit_camera_id', None)
+        return super().list(self, request, *args, **kwargs)
+
+    def get_queryset(self):
+        query = Trip.objects.all()
+        try:
+            if self.datetime_from:
+                query = query.filter(entry_time__gte=self.datetime_from)
+            if self.datetime_to:
+                query = query.filter(entry_time__lte=self.datetime_to)
+            if self.entry_camera_id:
+                query = query.filter(entry_camera_id=self.entry_camera_id)
+            if self.exit_camera_id:
+                query = query.filter(exit_camera_id=self.exit_camera_id)
+        except AttributeError:
+            pass
+        return query

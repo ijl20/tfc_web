@@ -26,7 +26,6 @@ docpatterns = [
      url(r'^api/v1/parking/', include('parking.api.urls')),
      url(r'^api/v1/traffic/', include('traffic.api.urls')),
      url(r'^api/v1/aq/', include('aq.api.urls')),
-     # Import transport views previously servedunder /transport/api/
      url(r'^api/v1/transport/', include('transport.api.urls')),
      ]
 
@@ -64,6 +63,5 @@ urlpatterns = [
     url(r'^v1/parking/', include('parking.api.urls')),
     url(r'^v1/traffic/', include('traffic.api.urls')),
     url(r'^v1/aq/', include('aq.api.urls')),
-    # Import transport views previously served under /transport/api/
     url(r'^v1/transport/', include('transport.api.urls')),
     ]

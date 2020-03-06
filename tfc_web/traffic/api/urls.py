@@ -14,4 +14,6 @@ urlpatterns = [
     url(r'^btjourney/history/(?P<id>[^/]+)/$', views.BTJourneyLinkHistory.as_view()),
     url(r'^btjourney/latest/$', views.BTJourneyLinkLatestList.as_view()),
     url(r'^btjourney/latest/(?P<id>[^/]+)/$', views.BTJourneyLinkLatest.as_view()),
+    url(r'^anpr/camera/$', views.ANPRCameraList.as_view()),
+    url(r'^anpr/trip/$', views.ANPRTripList.as_view()),
 ]
